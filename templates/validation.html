@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}Validation report{% endblock %}
+{% block content %}
+{% include "partials/wizard_nav.html" %}
+<div class="row g-4">
+  <div class="col-lg-4">
+    <div class="card card-cb kpi-card mb-3">
+      <div class="card-body">
+        <div class="text-muted small">Readiness</div>
+        <div class="kpi-value text-capitalize">{{ report.readiness|replace('_', ' ') }}</div>
+      </div>
+    </div>
+    <div class="card card-cb mb-3">
+      <div class="card-body">
+        <dl class="row mb-0 small">
+          <dt class="col-7">Uploaded rows</dt><dd class="col-5">{{ report.uploaded_row_count }}</dd>
+          <dt class="col-7">Valid rows</dt><dd class="col-5">{{ report.valid_row_count }}</dd>
+          <dt class="col-7">Rejected rows</dt><dd class="col-5">{{ report.rejected_row_count }}</dd>
+          <dt class="col-7">Months covered</dt><dd class="col-5">{{ report.month_count }}</dd>
+          <dt class="col-7">Total volume</dt><dd class="col-5">{{ report.total_volume|format_number }}</dd>
+          <dt class="col-7">Total liability</dt><dd class="col-5">{{ report.total_liability|format_number }}</dd>
+        </dl>
+      </div>
+    </div>
+    {% if report.rejected_row_count > 0 %}
+    <a class="btn btn-outline-danger w-100 mb-3" href="{{ url_for('export_rejected', session_id=session_id) }}">
+      <i class="fa-solid fa-download me-2"></i>Download rejected rows CSV
+    </a>
+    {% endif %}
+    {% if report.is_valid %}
+    <a class="btn btn-cb-primary w-100" href="{{ url_for('session_configure', session_id=session_id) }}">Continue to configuration</a>
+    {% else %}
+    <button type="button" class="btn btn-secondary w-100" disabled title="Fix validation issues or edit schema first">Continue to configuration</button>
+    {% endif %}
+  </div>
+  <div class="col-lg-8">
+    <div class="card card-cb">
+      <div class="card-header"><i class="fa-solid fa-clipboard-check me-2"></i>Validation details</div>
+      <div class="card-body">
+        {% if not report.is_valid %}
+        <div class="alert alert-danger">Validation failed. Fix source data or mappings before forecasting.</div>
+        {% elif report.warnings %}
+        <div class="alert alert-warning alert-cb">Review warnings before proceeding.</div>
+        {% else %}
+        <div class="alert alert-success">Data passed validation checks.</div>
+        {% endif %}
+        {% if report.missing_months %}
+        <p><strong>Missing months:</strong> {{ report.missing_months|join(', ') }}</p>
+        {% endif %}
+        <h6>Issues</h6>
+        <div class="table-responsive">
+          <table class="table table-sm">
+            <thead><tr><th>Severity</th><th>Code</th><th>Message</th><th>Column</th></tr></thead>
+            <tbody>
+              {% for issue in report.issues %}
+              <tr>
+                <td><span class="badge bg-{{ 'danger' if issue.severity == 'error' else 'warning' }}">{{ issue.severity }}</span></td>
+                <td>{{ issue.code }}</td>
+                <td>{{ issue.message }}</td>
+                <td>{{ issue.column or '—' }}</td>
+              </tr>
+              {% else %}
+              <tr><td colspan="4" class="text-muted">No issues recorded.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% if report.rejected_records_sample %}
+        <h6 class="mt-3">Rejected sample</h6>
+        <pre class="small bg-light p-2 rounded">{{ report.rejected_records_sample|tojson(indent=2) }}</pre>
+        {% endif %}
+        <a class="btn btn-outline-secondary mt-2" href="{{ url_for('session_schema', session_id=session_id) }}">Edit schema</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

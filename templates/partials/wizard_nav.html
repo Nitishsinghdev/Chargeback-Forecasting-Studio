@@ -1,0 +1,22 @@
+{% set steps = [
+  ('upload', 'Upload', 'fa-file-arrow-up'),
+  ('schema', 'Schema', 'fa-table-columns'),
+  ('validation', 'Validation', 'fa-clipboard-check'),
+  ('configure', 'Configure', 'fa-sliders'),
+  ('events', 'Events', 'fa-comment-dots'),
+  ('dashboard', 'Dashboard', 'fa-gauge-high')
+] %}
+<div class="card card-cb mb-4">
+  <div class="card-body py-3">
+    <div class="row g-2">
+      {% for key, label, icon in steps %}
+      <div class="col-6 col-md-2">
+        <div class="wizard-step {% if current_step == key %}current{% elif step_index(key) < step_index(current_step) %}done{% endif %}">
+          <span class="badge bg-secondary"><i class="fa-solid {{ icon }}"></i></span>
+          <span>{{ label }}</span>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>

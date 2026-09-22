@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Error{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-6">
+    <div class="card card-cb border-danger">
+      <div class="card-header bg-danger"><i class="fa-solid fa-circle-exclamation me-2"></i>{{ title or 'Something went wrong' }}</div>
+      <div class="card-body">
+        <p>{{ message }}</p>
+        <a class="btn btn-cb-primary" href="{{ url_for('index') }}">Return home</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

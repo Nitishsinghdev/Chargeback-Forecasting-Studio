@@ -1,0 +1,378 @@
+{% extends "base.html" %}
+
+{% block title %}Forecast configuration{% endblock %}
+
+{% block content %}
+
+{% include "partials/wizard_nav.html" %}
+
+<div class="card card-cb">
+
+  <div class="card-header"><i class="fa-solid fa-sliders me-2"></i>Analysis configuration</div>
+
+  <div class="card-body">
+
+    <form method="post" action="{{ url_for('session_configure', session_id=session_id) }}">
+
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+      <div class="row g-3">
+
+        <div class="col-md-4">
+
+          <label class="form-label" for="history_months">History window (months)</label>
+
+          <input type="number" class="form-control" id="history_months" name="history_months" min="6" max="120" value="{{ settings.history_months }}" required>
+
+        </div>
+
+        <div class="col-md-4">
+
+          <label class="form-label" for="horizon_months">Forecast horizon (months)</label>
+
+          <input type="number" class="form-control" id="horizon_months" name="horizon_months" min="1" max="24" value="{{ settings.horizon_months }}" required>
+
+          <div class="form-text">Default 3-month executive horizon.</div>
+
+        </div>
+
+        <div class="col-md-4">
+
+          <label class="form-label" for="confidence_level">Confidence level</label>
+
+          <input type="number" step="0.01" class="form-control" id="confidence_level" name="confidence_level" min="0.5" max="0.99" value="{{ settings.confidence_level }}" required>
+
+        </div>
+
+        <div class="col-md-4">
+
+          <label class="form-label" for="holdout_months">Holdout months</label>
+
+          <input type="number" class="form-control" id="holdout_months" name="holdout_months" min="1" max="12" value="{{ settings.holdout_months }}" required>
+
+        </div>
+
+        <div class="col-md-4">
+
+          <label class="form-label" for="min_train_months">Min training months</label>
+
+          <input type="number" class="form-control" id="min_train_months" name="min_train_months" min="6" max="60" value="{{ settings.min_train_months }}" required>
+
+        </div>
+
+        <div class="col-md-4">
+
+          <label class="form-label" for="rolling_folds">Rolling validation folds</label>
+
+          <input type="number" class="form-control" id="rolling_folds" name="rolling_folds" min="1" max="8" value="{{ settings.rolling_folds }}" required>
+
+        </div>
+
+        <div class="col-md-4">
+
+          <label class="form-label" for="currency_code">Display currency</label>
+
+          <input type="text" class="form-control" id="currency_code" name="currency_code" maxlength="8" value="{{ settings.currency_code }}" placeholder="USD">
+
+        </div>
+
+        <div class="col-md-4">
+
+          <label class="form-label" for="segment_column">Primary segment column</label>
+
+          <select class="form-select" id="segment_column" name="segment_column">
+
+            <option value="">— overall only —</option>
+
+            {% for c in segment_columns %}
+
+            <option value="{{ c }}" {% if settings.segment_column == c %}selected{% endif %}>{{ c }}</option>
+
+            {% endfor %}
+
+          </select>
+
+        </div>
+
+        <div class="col-md-4">
+
+          <label class="form-label" for="segment_value">Segment filter value</label>
+
+          <select class="form-select" id="segment_value" name="segment_value">
+
+            <option value="">— first / all for segmented run —</option>
+
+            {% for v in segment_values %}
+
+            <option value="{{ v }}" {% if settings.segment_value == v %}selected{% endif %}>{{ v }}</option>
+
+            {% endfor %}
+
+          </select>
+
+        </div>
+
+        <div class="col-md-6">
+
+          <label class="form-label" for="business_unit">Business unit filter</label>
+
+          <select class="form-select" id="business_unit" name="business_unit">
+
+            <option value="">— all —</option>
+
+            {% for v in business_units %}
+
+            <option value="{{ v }}" {% if settings.business_unit == v %}selected{% endif %}>{{ v }}</option>
+
+            {% endfor %}
+
+          </select>
+
+        </div>
+
+        <div class="col-md-6">
+
+          <label class="form-label" for="product">Product filter</label>
+
+          <select class="form-select" id="product" name="product">
+
+            <option value="">— all —</option>
+
+            {% for v in products %}
+
+            <option value="{{ v }}" {% if settings.product == v %}selected{% endif %}>{{ v }}</option>
+
+            {% endfor %}
+
+          </select>
+
+        </div>
+
+        <div class="col-12">
+
+          <div class="form-check">
+
+            <input class="form-check-input" type="checkbox" id="include_liability" name="include_liability" {% if settings.include_liability %}checked{% endif %}>
+
+            <label class="form-check-label" for="include_liability">Include liability forecast when amount column is mapped</label>
+
+          </div>
+
+          <div class="form-check">
+
+            <input class="form-check-input" type="checkbox" id="run_segment_breakdown" name="run_segment_breakdown" {% if settings.run_segment_breakdown %}checked{% endif %}>
+
+            <label class="form-check-label" for="run_segment_breakdown">Run per-segment volume breakdown (top segments)</label>
+
+          </div>
+
+        </div>
+
+      </div>
+
+
+
+      <div class="mt-4">
+
+        <button class="btn btn-link text-decoration-none px-0 advanced-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#advancedAlerts" aria-expanded="false" aria-controls="advancedAlerts">
+
+          <i class="fa-solid fa-bell me-2"></i>Advanced alert thresholds &amp; model quality bounds
+
+        </button>
+
+        <div class="collapse mt-2" id="advancedAlerts">
+
+          <div class="border rounded p-3 bg-white">
+
+            <p class="small text-muted">Alerts fire only when forecast outputs cross configured thresholds. Leave a threshold blank to disable that check.</p>
+
+            <div class="row g-3">
+
+              <div class="col-md-4">
+
+                <label class="form-label" for="global_alert_level">Default alert severity</label>
+
+                <select class="form-select" id="global_alert_level" name="global_alert_level">
+
+                  {% for lvl in alert_levels %}
+
+                  <option value="{{ lvl }}" {% if settings.global_alert_level == lvl %}selected{% endif %}>{{ lvl|capitalize }}</option>
+
+                  {% endfor %}
+
+                </select>
+
+              </div>
+
+              <div class="col-md-4">
+
+                <label class="form-label" for="mape_strong_threshold">MAPE — Strong ≤ (%)</label>
+
+                <input type="number" step="0.1" class="form-control" id="mape_strong_threshold" name="mape_strong_threshold" value="{{ settings.mape_strong_threshold }}">
+
+              </div>
+
+              <div class="col-md-4">
+
+                <label class="form-label" for="mape_acceptable_threshold">MAPE — Acceptable ≤ (%)</label>
+
+                <input type="number" step="0.1" class="form-control" id="mape_acceptable_threshold" name="mape_acceptable_threshold" value="{{ settings.mape_acceptable_threshold }}">
+
+              </div>
+
+              <div class="col-md-4">
+
+                <label class="form-label" for="mape_alert_threshold">MAPE alert threshold (%)</label>
+
+                <input type="number" step="0.1" class="form-control" id="mape_alert_threshold" name="mape_alert_threshold" value="{{ settings.mape_alert_threshold }}">
+
+              </div>
+
+              <div class="col-md-4">
+
+                <label class="form-label" for="mape_alert_level">MAPE alert severity</label>
+
+                <select class="form-select" id="mape_alert_level" name="mape_alert_level">
+
+                  <option value="">Use default</option>
+
+                  {% for lvl in alert_levels %}
+
+                  <option value="{{ lvl }}" {% if settings.mape_alert_level == lvl %}selected{% endif %}>{{ lvl|capitalize }}</option>
+
+                  {% endfor %}
+
+                </select>
+
+              </div>
+
+              <div class="col-md-4">
+
+                <label class="form-label" for="monthly_volume_alert_threshold">Monthly volume alert above</label>
+
+                <input type="number" step="1" class="form-control" id="monthly_volume_alert_threshold" name="monthly_volume_alert_threshold" value="{{ settings.monthly_volume_alert_threshold or '' }}" placeholder="Disabled">
+
+              </div>
+
+              <div class="col-md-4">
+
+                <label class="form-label" for="monthly_volume_alert_level">Volume alert severity</label>
+
+                <select class="form-select" id="monthly_volume_alert_level" name="monthly_volume_alert_level">
+
+                  <option value="">Use default</option>
+
+                  {% for lvl in alert_levels %}
+
+                  <option value="{{ lvl }}" {% if settings.monthly_volume_alert_level == lvl %}selected{% endif %}>{{ lvl|capitalize }}</option>
+
+                  {% endfor %}
+
+                </select>
+
+              </div>
+
+              <div class="col-md-4">
+
+                <label class="form-label" for="monthly_liability_alert_threshold">Monthly liability alert above</label>
+
+                <input type="number" step="1" class="form-control" id="monthly_liability_alert_threshold" name="monthly_liability_alert_threshold" value="{{ settings.monthly_liability_alert_threshold or '' }}" placeholder="Disabled">
+
+              </div>
+
+              <div class="col-md-4">
+
+                <label class="form-label" for="monthly_liability_alert_level">Liability alert severity</label>
+
+                <select class="form-select" id="monthly_liability_alert_level" name="monthly_liability_alert_level">
+
+                  <option value="">Use default</option>
+
+                  {% for lvl in alert_levels %}
+
+                  <option value="{{ lvl }}" {% if settings.monthly_liability_alert_level == lvl %}selected{% endif %}>{{ lvl|capitalize }}</option>
+
+                  {% endfor %}
+
+                </select>
+
+              </div>
+
+              <div class="col-md-4">
+
+                <label class="form-label" for="percent_growth_alert_threshold">MoM volume change alert (± %)</label>
+
+                <input type="number" step="0.1" class="form-control" id="percent_growth_alert_threshold" name="percent_growth_alert_threshold" value="{{ settings.percent_growth_alert_threshold if settings.percent_growth_alert_threshold is not none else '' }}" placeholder="Disabled">
+
+              </div>
+
+              <div class="col-md-4">
+
+                <label class="form-label" for="percent_growth_alert_level">Growth alert severity</label>
+
+                <select class="form-select" id="percent_growth_alert_level" name="percent_growth_alert_level">
+
+                  <option value="">Use default</option>
+
+                  {% for lvl in alert_levels %}
+
+                  <option value="{{ lvl }}" {% if settings.percent_growth_alert_level == lvl %}selected{% endif %}>{{ lvl|capitalize }}</option>
+
+                  {% endfor %}
+
+                </select>
+
+              </div>
+
+              <div class="col-md-4">
+
+                <label class="form-label" for="ci_width_alert_threshold_pct">CI width alert (% of forecast)</label>
+
+                <input type="number" step="0.1" class="form-control" id="ci_width_alert_threshold_pct" name="ci_width_alert_threshold_pct" value="{{ settings.ci_width_alert_threshold_pct if settings.ci_width_alert_threshold_pct is not none else '' }}" placeholder="Disabled">
+
+              </div>
+
+              <div class="col-md-4">
+
+                <label class="form-label" for="ci_width_alert_level">CI width alert severity</label>
+
+                <select class="form-select" id="ci_width_alert_level" name="ci_width_alert_level">
+
+                  <option value="">Use default</option>
+
+                  {% for lvl in alert_levels %}
+
+                  <option value="{{ lvl }}" {% if settings.ci_width_alert_level == lvl %}selected{% endif %}>{{ lvl|capitalize }}</option>
+
+                  {% endfor %}
+
+                </select>
+
+              </div>
+
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+
+
+
+      <div class="mt-4 d-flex gap-2">
+
+        <button type="submit" class="btn btn-cb-primary">Save &amp; continue to events</button>
+
+        <a class="btn btn-outline-secondary" href="{{ url_for('session_validation', session_id=session_id) }}">Back</a>
+
+      </div>
+
+    </form>
+
+  </div>
+
+</div>
+
+{% endblock %}
+

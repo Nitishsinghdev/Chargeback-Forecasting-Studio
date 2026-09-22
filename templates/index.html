@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Start · Chargeback Forecast Studio{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <div class="card card-cb">
+      <div class="card-header"><i class="fa-solid fa-play me-2"></i>Start a new analysis</div>
+      <div class="card-body p-4">
+        <p class="lead">Upload chargeback history as CSV. We detect columns, validate rows, apply events, and produce executive forecasts with volume and liability paths when available.</p>
+        <ul class="text-muted">
+          <li>Maximum upload size is <strong>250 MB</strong>; only <code>.csv</code> is accepted</li>
+          <li>Your dataset stays in server memory — not stored in browser cookies</li>
+          <li>Multi-step wizard: schema → validation → configuration → events → dashboard</li>
+        </ul>
+        <a class="btn btn-cb-primary btn-lg" href="{{ url_for('upload') }}">
+          <i class="fa-solid fa-file-arrow-up me-2"></i>Upload CSV
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

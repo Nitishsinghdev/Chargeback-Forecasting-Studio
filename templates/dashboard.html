@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+{% block title %}Executive dashboard{% endblock %}
+{% block head_extra %}
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
+{% endblock %}
+{% block content %}
+{% include "partials/wizard_nav.html" %}
+
+{% if alerts %}
+<div class="mb-4">
+  {% for alert in alerts %}
+  <div class="alert alert-{{ alert.level }} alert-cb mb-2"><i class="fa-solid fa-triangle-exclamation me-2"></i>{{ alert.message }}</div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div class="row g-3 mb-4">
+  {% for kpi in kpi_cards %}
+  <div class="col-6 col-lg-3">
+    <div class="card card-cb kpi-card h-100{% if kpi.tone %} kpi-tone-{{ kpi.tone }}{% endif %}">
+      <div class="card-body">
+        <div class="text-muted small">{{ kpi.label }}</div>
+        <div class="kpi-value">{{ kpi.value }}</div>
+        {% if kpi.hint %}<div class="small text-muted">{{ kpi.hint }}</div>{% endif %}
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="d-flex flex-wrap gap-2 mb-4">
+  <div class="dropdown">
+    <button class="btn btn-cb-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">Export forecast</button>
+    <ul class="dropdown-menu">
+      <li><a class="dropdown-item" href="{{ url_for('export_forecast', session_id=session_id, fmt='csv') }}">CSV</a></li>
+      <li><a class="dropdown-item" href="{{ url_for('export_forecast', session_id=session_id, fmt='json') }}">JSON</a></li>
+      <li><a class="dropdown-item" href="{{ url_for('export_forecast', session_id=session_id, fmt='xlsx') }}">Excel (XLSX)</a></li>
+    </ul>
+  </div>
+  <div class="dropdown">
+    <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">Audit trail</button>
+    <ul class="dropdown-menu">
+      <li><a class="dropdown-item" href="{{ url_for('export_audit', session_id=session_id, fmt='json') }}">JSON</a></li>
+      <li><a class="dropdown-item" href="{{ url_for('export_audit', session_id=session_id, fmt='csv') }}">CSV summary</a></li>
+    </ul>
+  </div>
+  <a class="btn btn-outline-secondary" href="{{ url_for('session_events', session_id=session_id) }}">Adjust events</a>
+  <a class="btn btn-outline-secondary" href="{{ url_for('session_configure', session_id=session_id) }}">Reconfigure</a>
+</div>
+
+<div class="row g-4 mb-4">
+  <div class="col-lg-8">
+    <div class="card card-cb">
+      <div class="card-header">Historical &amp; forecast (primary metric)</div>
+      <div class="card-body chart-container" data-plotly='{{ charts.main|tojson }}'></div>
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="card card-cb mb-4">
+      <div class="card-header">Baseline vs adjusted</div>
+      <div class="card-body chart-container" data-plotly='{{ charts.baseline_adjusted|tojson }}'></div>
+    </div>
+    {% if charts.seasonality %}
+    <div class="card card-cb">
+      <div class="card-header">Same-month history</div>
+      <div class="card-body chart-container" data-plotly='{{ charts.seasonality|tojson }}'></div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{% if charts.liability %}
+<div class="card card-cb mb-4">
+  <div class="card-header">Liability forecast</div>
+  <div class="card-body chart-container" data-plotly='{{ charts.liability|tojson }}'></div>
+</div>
+{% endif %}
+
+{% if charts.segments %}
+<div class="row g-4 mb-4">
+  <div class="col-lg-6">
+    <div class="card card-cb">
+      <div class="card-header">Segment comparison (horizon total adjusted)</div>
+      <div class="card-body chart-container" data-plotly='{{ charts.segments|tojson }}'></div>
+    </div>
+  </div>
+  {% if charts.heatmap %}
+  <div class="col-lg-6">
+    <div class="card card-cb">
+      <div class="card-header">Segment × period heatmap</div>
+      <div class="card-body chart-container" data-plotly='{{ charts.heatmap|tojson }}'></div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+{% if charts.diagnostics %}
+<div class="card card-cb mb-4">
+  <div class="card-header">Model quality (holdout / validation)</div>
+  <div class="card-body chart-container" data-plotly='{{ charts.diagnostics|tojson }}'></div>
+</div>
+{% endif %}
+
+<div class="row g-4 mb-4">
+  <div class="col-lg-6">
+    <div class="card card-cb">
+      <div class="card-header"><i class="fa-solid fa-lightbulb me-2"></i>Explanation</div>
+      <div class="card-body">
+        <p>{{ explanations.summary }}</p>
+        <p class="small"><strong>Model:</strong> {{ explanations.model_rationale }}</p>
+        <p class="small"><strong>Events:</strong> {{ explanations.event_rationale }}</p>
+        <p class="small"><strong>Validation:</strong> {{ explanations.validation_rationale }}</p>
+        {% if explanations.caveats %}
+        <ul class="small text-muted">{% for c in explanations.caveats %}<li>{{ c }}</li>{% endfor %}</ul>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card card-cb">
+      <div class="card-header">Model selection</div>
+      <div class="card-body small">
+        <dl class="row mb-0">
+          <dt class="col-5">Model</dt><dd class="col-7">{{ model_selection.model_kind }}</dd>
+          <dt class="col-5">Strategy</dt><dd class="col-7">{{ model_selection.validation_strategy }}</dd>
+          <dt class="col-5">MAPE</dt><dd class="col-7">{{ model_selection.metrics.mape|format_optional('%', '—') }}</dd>
+          <dt class="col-5">RMSE</dt><dd class="col-7">{{ model_selection.metrics.rmse|format_optional('', '—') }}</dd>
+          <dt class="col-5">Fallback</dt><dd class="col-7">{{ model_selection.fallback_reason or 'None' }}</dd>
+        </dl>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card card-cb">
+  <div class="card-header">Forecast table</div>
+  <div class="card-body table-responsive">
+    <table class="table table-sm table-striped table-cb">
+      <thead>
+        <tr>
+          <th>Period</th><th>Metric</th><th>Baseline</th><th>Adjusted</th><th>Event Δ</th><th>Lower</th><th>Upper</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in forecast_rows %}
+        <tr>
+          <td>{{ row.period }}</td>
+          <td>{{ row.metric }}</td>
+          <td>{{ row.baseline|format_number }}</td>
+          <td>{{ row.adjusted|format_number }}</td>
+          <td>{{ row.event_adjustment|format_number }}</td>
+          <td>{{ row.lower|format_number }}</td>
+          <td>{{ row.upper|format_number }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+{% endblock %}

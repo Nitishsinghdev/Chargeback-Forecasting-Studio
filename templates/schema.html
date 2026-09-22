@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}Schema mapping{% endblock %}
+{% block content %}
+{% include "partials/wizard_nav.html" %}
+<div class="card card-cb mb-4">
+  <div class="card-header"><i class="fa-solid fa-table-columns me-2"></i>Detected schema profile</div>
+  <div class="card-body">
+    {% if schema.detection_notes %}
+    <div class="alert alert-info alert-cb">
+      <strong>Detection notes:</strong>
+      <ul class="mb-0">{% for n in schema.detection_notes %}<li>{{ n }}</li>{% endfor %}</ul>
+    </div>
+    {% endif %}
+    <form method="post" action="{{ url_for('session_schema', session_id=session_id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <div class="row g-3">
+        {% macro col_select(name, label, current, optional=false) %}
+        <div class="col-md-6">
+          <label class="form-label" for="{{ name }}">{{ label }}{% if not optional %} *{% endif %}</label>
+          <select class="form-select" id="{{ name }}" name="{{ name }}">
+            {% if optional %}<option value="">— none —</option>{% endif %}
+            {% for c in columns %}
+            <option value="{{ c }}" {% if c == current %}selected{% endif %}>{{ c }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        {% endmacro %}
+        {{ col_select('date_column', 'Date column', schema.date_column) }}
+        {{ col_select('amount_column', 'Amount / liability column', schema.amount_column, true) }}
+        {{ col_select('count_column', 'Count column', schema.count_column, true) }}
+        {{ col_select('case_id_column', 'Case ID column', schema.case_id_column, true) }}
+        {{ col_select('business_unit_column', 'Business unit column', schema.business_unit_column, true) }}
+        {{ col_select('product_column', 'Product column', schema.product_column, true) }}
+        {{ col_select('category_column', 'Category column', schema.category_column, true) }}
+        {{ col_select('status_column', 'Status column', schema.status_column, true) }}
+        {{ col_select('reason_code_column', 'Reason code column', schema.reason_code_column, true) }}
+        <div class="col-md-6">
+          <label class="form-label" for="volume_aggregation_mode">Volume aggregation</label>
+          <select class="form-select" id="volume_aggregation_mode" name="volume_aggregation_mode">
+            {% for mode in volume_modes %}
+            <option value="{{ mode }}" {% if schema.volume_aggregation_mode.value == mode %}selected{% endif %}>{{ mode }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <h5 class="mt-4">Column confidence profiles</h5>
+      <div class="table-responsive">
+        <table class="table table-sm table-striped table-cb">
+          <thead><tr><th>Column</th><th>Role</th><th>Confidence</th><th>Sample</th></tr></thead>
+          <tbody>
+            {% for col, prof in schema.column_profiles.items() %}
+            <tr>
+              <td>{{ col }}</td>
+              <td>{{ prof.inferred_role }}</td>
+              <td>{{ '%.2f'|format(prof.confidence) }}</td>
+              <td class="small text-muted">{{ prof.sample_values|join(', ') }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="d-flex gap-2 mt-3">
+        <button type="submit" class="btn btn-cb-primary">Apply mappings &amp; validate</button>
+        <a class="btn btn-outline-secondary" href="{{ url_for('upload') }}">Start over</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Upload CSV{% endblock %}
+{% block content %}
+{% include "partials/wizard_nav.html" %}
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <div class="card card-cb">
+      <div class="card-header"><i class="fa-solid fa-file-arrow-up me-2"></i>Upload chargeback CSV</div>
+      <div class="card-body p-4">
+        <form method="post" enctype="multipart/form-data" action="{{ url_for('upload') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <div class="mb-3">
+            <label for="csv_file" class="form-label">CSV file</label>
+            <input class="form-control" type="file" id="csv_file" name="csv_file" accept=".csv,text/csv" required>
+            <div class="form-text">Maximum file size is 250 MB. Unknown schemas are profiled automatically after upload.</div>
+          </div>
+          <button type="submit" class="btn btn-cb-primary">
+            <i class="fa-solid fa-upload me-2"></i>Upload and detect schema
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,142 @@
+:root {
+  --cb-navy: #0a2540;
+  --cb-blue: #1e5a8a;
+  --cb-sky: #4da3d9;
+  --cb-light: #e8f4fc;
+  --cb-white: #ffffff;
+  --cb-muted: #6c757d;
+  --cb-success: #198754;
+  --cb-warning: #ffc107;
+  --cb-danger: #dc3545;
+}
+
+body {
+  background: linear-gradient(180deg, var(--cb-light) 0%, var(--cb-white) 120px);
+  color: var(--cb-navy);
+  min-height: 100vh;
+}
+
+.navbar-cb {
+  background: var(--cb-navy) !important;
+}
+
+.navbar-cb .navbar-brand,
+.navbar-cb .nav-link {
+  color: var(--cb-white) !important;
+}
+
+.navbar-cb .nav-link.active {
+  color: var(--cb-sky) !important;
+  font-weight: 600;
+}
+
+.card-cb {
+  border: none;
+  box-shadow: 0 0.25rem 1rem rgba(10, 37, 64, 0.08);
+  border-radius: 0.5rem;
+}
+
+.card-cb .card-header {
+  background: var(--cb-navy);
+  color: var(--cb-white);
+  font-weight: 600;
+  border-radius: 0.5rem 0.5rem 0 0 !important;
+}
+
+.kpi-card {
+  border-left: 4px solid var(--cb-blue);
+}
+
+.kpi-card .kpi-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--cb-blue);
+}
+
+.kpi-tone-strong {
+  border-left-color: var(--cb-success);
+}
+
+.kpi-tone-strong .kpi-value {
+  color: var(--cb-success);
+}
+
+.kpi-tone-acceptable {
+  border-left-color: var(--cb-blue);
+}
+
+.kpi-tone-weak {
+  border-left-color: var(--cb-warning);
+}
+
+.kpi-tone-weak .kpi-value {
+  color: #b8860b;
+}
+
+.kpi-tone-insufficient {
+  border-left-color: var(--cb-muted);
+}
+
+.kpi-tone-insufficient .kpi-value {
+  color: var(--cb-muted);
+  font-size: 1.35rem;
+}
+
+.advanced-toggle {
+  color: var(--cb-blue);
+  font-weight: 600;
+}
+
+.wizard-step {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.wizard-step .badge {
+  width: 1.75rem;
+  height: 1.75rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+.wizard-step.done .badge {
+  background: var(--cb-success) !important;
+}
+
+.wizard-step.current .badge {
+  background: var(--cb-sky) !important;
+}
+
+.alert-cb {
+  border-left: 4px solid var(--cb-warning);
+}
+
+.table-cb thead {
+  background: var(--cb-navy);
+  color: var(--cb-white);
+}
+
+.btn-cb-primary {
+  background: var(--cb-blue);
+  border-color: var(--cb-blue);
+  color: var(--cb-white);
+}
+
+.btn-cb-primary:hover {
+  background: var(--cb-navy);
+  border-color: var(--cb-navy);
+  color: var(--cb-white);
+}
+
+footer.site-footer {
+  color: var(--cb-muted);
+  font-size: 0.875rem;
+}
+
+.chart-container {
+  min-height: 320px;
+}

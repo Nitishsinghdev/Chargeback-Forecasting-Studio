@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Business events{% endblock %}
+{% block content %}
+{% include "partials/wizard_nav.html" %}
+<div class="row g-4">
+  <div class="col-lg-5">
+    <div class="card card-cb">
+      <div class="card-header"><i class="fa-solid fa-comment-dots me-2"></i>Natural language events</div>
+      <div class="card-body">
+        <form method="post" action="{{ url_for('session_events', session_id=session_id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <label class="form-label" for="event_text_batch">Describe events (one per line)</label>
+          <textarea class="form-control mb-2" id="event_text_batch" name="event_text_batch" rows="8" placeholder="Example: 10% volume increase for Product X from Jan 2025 to Mar 2025">{{ event_text_batch }}</textarea>
+          <button type="button" class="btn btn-outline-primary btn-sm mb-3" id="btn-parse-events" data-session="{{ session_id }}" data-csrf="{{ csrf_token }}">
+            <i class="fa-solid fa-wand-magic-sparkles me-1"></i>Preview parse (API)
+          </button>
+          <div id="parse-preview" class="mb-3"></div>
+          <button type="submit" name="action" value="parse" class="btn btn-outline-secondary">Parse &amp; review</button>
+          <button type="submit" name="action" value="forecast" class="btn btn-cb-primary ms-2">
+            <i class="fa-solid fa-bolt me-2"></i>Generate forecast
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-7">
+    <div class="card card-cb">
+      <div class="card-header"><i class="fa-solid fa-list-check me-2"></i>Parsed events — approve &amp; edit</div>
+      <div class="card-body">
+        {% if not events %}
+        <p class="text-muted mb-0">No events yet. Enter descriptions and click Parse or Generate.</p>
+        {% else %}
+        <form method="post" action="{{ url_for('session_events_update', session_id=session_id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <div class="table-responsive">
+            <table class="table table-sm align-middle">
+              <thead><tr><th>Approve</th><th>Event</th><th>Effect</th><th>Period</th><th>Confidence</th></tr></thead>
+              <tbody>
+                {% for ev in events %}
+                <tr>
+                  <td>
+                    <input type="checkbox" name="approved_{{ loop.index0 }}" {% if ev.approved %}checked{% endif %}>
+                  </td>
+                  <td>
+                    <input type="hidden" name="raw_{{ loop.index0 }}" value="{{ ev.raw_text }}">
+                    <strong>{{ ev.event_name or 'Event' }}</strong><br>
+                    <span class="small text-muted">{{ ev.raw_text }}</span>
+                    <input class="form-control form-control-sm mt-1" name="annotation_{{ loop.index0 }}" value="{{ ev.annotation or '' }}" placeholder="Annotation">
+                  </td>
+                  <td class="small">
+                    {{ ev.effect_type }} {{ ev.effect_value or '—' }}<br>
+                    {{ ev.direction or '' }} · {{ ev.metric or 'unknown' }}
+                  </td>
+                  <td class="small">
+                    {% if ev.start_period %}{{ ev.start_period[:7] }}{% endif %}
+                    {% if ev.end_period %} → {{ ev.end_period[:7] }}{% endif %}
+                  </td>
+                  <td>{{ '%.0f'|format((ev.confidence or 0) * 100) }}%</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          <input type="hidden" name="event_count" value="{{ events|length }}">
+          <button type="submit" class="btn btn-outline-primary">Save approvals</button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
