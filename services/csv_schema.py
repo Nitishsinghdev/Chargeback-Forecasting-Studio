@@ -15,6 +15,11 @@ from models.domain_types import (
     SchemaMappingOverride,
     VolumeAggregationMode,
 )
+from services.numeric_parse import (
+    currency_marker_ratio,
+    date_parse_ratio_flexible,
+    numeric_ratio_currency,
+)
 
 _NORMALIZE = re.compile(r"[^a-z0-9]+")
 
@@ -28,6 +33,13 @@ ROLE_CASE_ID = "case_id"
 ROLE_REASON_CODE = "reason_code"
 ROLE_CATEGORY = "category"
 ROLE_CATEGORY_CANDIDATE = "category_candidate"
+
+# Extra ranking weight for numeric columns whose values carry a currency marker.
+CURRENCY_MARKER_BONUS = 0.5
+
+# A numeric role requires actual numeric content, regardless of how suggestive the
+# column name is.
+MIN_NUMERIC_EVIDENCE = 0.5
 
 
 def _normalize_name(name: str) -> str:
@@ -51,19 +63,13 @@ def _score_name_match(column: str, candidates: Sequence[str]) -> float:
 
 
 def _date_parse_ratio(series: pd.Series) -> float:
-    if series.empty:
-        return 0.0
-    sample = series.head(min(len(series), 5000))
-    parsed = pd.to_datetime(sample, errors="coerce", utc=False)
-    return float(parsed.notna().mean())
+    """Date share, tolerating files that mix several date layouts."""
+    return date_parse_ratio_flexible(series)
 
 
 def _numeric_ratio(series: pd.Series) -> float:
-    if series.empty:
-        return 0.0
-    sample = series.head(min(len(series), 5000))
-    converted = pd.to_numeric(sample, errors="coerce")
-    return float(converted.notna().mean())
+    """Numeric share, tolerating currency formatting such as ``$1,234.56``."""
+    return numeric_ratio_currency(series)
 
 
 def _sample_values(series: pd.Series, limit: int = 5) -> List[str]:
@@ -76,6 +82,7 @@ def _rank_by_role(
     candidates: Sequence[str],
     *,
     require_numeric: bool = False,
+    prefer_currency: bool = False,
     cfg: AppConfig,
     exclude: Sequence[str],
 ) -> List[Tuple[str, float, ColumnProfile]]:
@@ -89,9 +96,16 @@ def _rank_by_role(
         parse_ratio = _date_parse_ratio(df[col]) if not require_numeric else None
         num_ratio = _numeric_ratio(df[col]) if require_numeric else None
         if require_numeric:
+            # A name match alone must never win: an amount column has to hold numbers,
+            # otherwise labels like "Chargeback Status" beat the real value column.
+            if (num_ratio or 0.0) < MIN_NUMERIC_EVIDENCE:
+                continue
             if (num_ratio or 0.0) < cfg.csv.min_numeric_ratio and name_score < 0.55:
                 continue
             combined = 0.5 * (num_ratio or 0.0) + 0.5 * name_score
+            if prefer_currency:
+                # Monetary columns are usually written with a currency symbol or code.
+                combined += CURRENCY_MARKER_BONUS * currency_marker_ratio(df[col])
             role = candidates[0] if candidates else "numeric"
         else:
             if (parse_ratio or 0.0) < cfg.csv.min_date_parse_ratio and name_score < 0.55:
@@ -396,6 +410,7 @@ def detect_csv_schema(
         work,
         cfg.csv.amount_column_candidates,
         require_numeric=True,
+        prefer_currency=True,
         cfg=cfg,
         exclude=reserved,
     )

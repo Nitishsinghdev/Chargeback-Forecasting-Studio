@@ -9,6 +9,10 @@ import pandas as pd
 
 from config import AppConfig, get_config
 from models.domain_types import DetectedSchema, ValidationIssue, ValidationReport, VolumeAggregationMode
+from services.numeric_parse import to_datetime_flexible, to_numeric_currency
+
+# Per-row examples kept in the validation report before switching to a summary count.
+MAX_ISSUE_EXAMPLES = 20
 
 
 def _month_range_stats(dates: pd.Series) -> tuple[int, List[str]]:
@@ -27,12 +31,12 @@ def _month_range_stats(dates: pd.Series) -> tuple[int, List[str]]:
 def _compute_totals(cleaned: pd.DataFrame, schema: DetectedSchema) -> tuple[float, float]:
     total_liability = 0.0
     if schema.amount_column and schema.amount_column in cleaned.columns:
-        total_liability = float(pd.to_numeric(cleaned[schema.amount_column], errors="coerce").fillna(0).sum())
+        total_liability = float(to_numeric_currency(cleaned[schema.amount_column]).fillna(0).sum())
 
     if schema.volume_aggregation_mode == VolumeAggregationMode.UNIQUE_CASE and schema.case_id_column:
         total_volume = float(cleaned[schema.case_id_column].nunique(dropna=True))
     elif schema.volume_aggregation_mode == VolumeAggregationMode.SUM_COUNT and schema.count_column:
-        total_volume = float(pd.to_numeric(cleaned[schema.count_column], errors="coerce").fillna(0).sum())
+        total_volume = float(to_numeric_currency(cleaned[schema.count_column]).fillna(0).sum())
     else:
         total_volume = float(len(cleaned))
     return total_volume, total_liability
@@ -118,48 +122,62 @@ def validate_dataframe(
             )
         )
 
-    work["_parsed_date"] = pd.to_datetime(work[schema.date_column], errors="coerce")
+    work["_parsed_date"] = to_datetime_flexible(work[schema.date_column])
     bad_dates = work["_parsed_date"].isna()
-    rejected_indexes: List[int] = []
-    for idx in work.index[bad_dates]:
-        rejected_indexes.append(int(idx))
-        if len([i for i in issues if i.code == "invalid_date"]) < 20:
-            issues.append(
-                ValidationIssue(
-                    severity="error",
-                    code="invalid_date",
-                    message="Unparseable date value",
-                    column=schema.date_column,
-                    row_index=int(idx) if isinstance(idx, int) else None,
-                )
+    bad_date_positions = work.index[bad_dates]
+    bad_date_count = int(len(bad_date_positions))
+    for idx in bad_date_positions[:MAX_ISSUE_EXAMPLES]:
+        issues.append(
+            ValidationIssue(
+                severity="error",
+                code="invalid_date",
+                message="Unparseable date value",
+                column=schema.date_column,
+                row_index=int(idx) if isinstance(idx, int) else None,
             )
-    if bad_dates.sum() > 20:
+        )
+    if bad_date_count > MAX_ISSUE_EXAMPLES:
         issues.append(
             ValidationIssue(
                 severity="error",
                 code="invalid_date_truncated",
-                message=f"Additional invalid dates suppressed: {int(bad_dates.sum()) - 20}",
+                message=f"Additional invalid dates suppressed: {bad_date_count - MAX_ISSUE_EXAMPLES}",
                 column=schema.date_column,
             )
         )
 
     bad_amounts = pd.Series(False, index=work.index)
+    bad_amount_positions = work.index[:0]
     if schema.amount_column and schema.amount_column in work.columns:
-        work["_parsed_amount"] = pd.to_numeric(work[schema.amount_column], errors="coerce")
+        work["_parsed_amount"] = to_numeric_currency(work[schema.amount_column])
         bad_amounts = work["_parsed_amount"].isna()
-        for idx in work.index[bad_amounts]:
-            if int(idx) not in rejected_indexes:
-                rejected_indexes.append(int(idx))
-            if len([i for i in issues if i.code == "invalid_amount"]) < 20:
-                issues.append(
-                    ValidationIssue(
-                        severity="error",
-                        code="invalid_amount",
-                        message="Unparseable numeric amount",
-                        column=schema.amount_column,
-                        row_index=int(idx) if isinstance(idx, int) else None,
-                    )
+        bad_amount_positions = work.index[bad_amounts]
+        bad_amount_count = int(len(bad_amount_positions))
+        for idx in bad_amount_positions[:MAX_ISSUE_EXAMPLES]:
+            issues.append(
+                ValidationIssue(
+                    severity="error",
+                    code="invalid_amount",
+                    message="Unparseable numeric amount",
+                    column=schema.amount_column,
+                    row_index=int(idx) if isinstance(idx, int) else None,
                 )
+            )
+        if bad_amount_count > MAX_ISSUE_EXAMPLES:
+            issues.append(
+                ValidationIssue(
+                    severity="error",
+                    code="invalid_amount_truncated",
+                    message=f"Additional invalid amounts suppressed: {bad_amount_count - MAX_ISSUE_EXAMPLES}",
+                    column=schema.amount_column,
+                )
+            )
+
+    # Union of rejected rows, computed vectorised: a per-row membership test over a
+    # growing list is quadratic and stalls on large files.
+    rejected_indexes: List[int] = [
+        int(i) for i in work.index[bad_dates | bad_amounts]
+    ]
 
     valid_mask = (~bad_dates) & (~bad_amounts)
     cleaned = work.loc[valid_mask].copy()

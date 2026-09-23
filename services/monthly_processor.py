@@ -9,6 +9,7 @@ import pandas as pd
 
 from config import AppConfig, get_config
 from models.domain_types import DetectedSchema, ForecastMetric, MonthlySeries, VolumeAggregationMode
+from services.numeric_parse import to_datetime_flexible, to_numeric_currency
 
 
 def _to_month_start(ts: pd.Timestamp) -> datetime:
@@ -66,11 +67,12 @@ def aggregate_to_monthly(
         return MonthlySeries([], [], segment_key=segment_value, metric=metric.value, metadata={"empty_after_filter": True})
 
     work = work.copy()
-    work["_month"] = pd.to_datetime(work[schema.date_column]).dt.to_period("M").dt.to_timestamp()
+    work["_month"] = to_datetime_flexible(work[schema.date_column]).dt.to_period("M").dt.to_timestamp()
 
     if metric == ForecastMetric.LIABILITY:
         if not schema.amount_column or schema.amount_column not in work.columns:
             raise ValueError("Liability metric requested but no amount column is mapped")
+        work[schema.amount_column] = to_numeric_currency(work[schema.amount_column]).fillna(0.0)
         grouped = work.groupby("_month", as_index=False)[schema.amount_column].sum()
         grouped = grouped.sort_values("_month")
         values = [float(v) for v in grouped[schema.amount_column]]
@@ -80,7 +82,7 @@ def aggregate_to_monthly(
             if schema.volume_aggregation_mode == VolumeAggregationMode.UNIQUE_CASE and schema.case_id_column:
                 val = float(grp[schema.case_id_column].nunique(dropna=True))
             elif schema.volume_aggregation_mode == VolumeAggregationMode.SUM_COUNT and schema.count_column:
-                val = float(pd.to_numeric(grp[schema.count_column], errors="coerce").fillna(0).sum())
+                val = float(to_numeric_currency(grp[schema.count_column]).fillna(0).sum())
             else:
                 val = float(len(grp))
             rows.append({"_month": month, "value": val})

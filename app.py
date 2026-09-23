@@ -12,6 +12,7 @@ import uuid
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from io import BytesIO
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -166,12 +167,49 @@ def _format_optional(value: Any, suffix: str = "", default: str = "—") -> str:
     return f"{value:.2f}{suffix}" if isinstance(value, (int, float)) else str(value)
 
 
+def _log_file_path() -> Path:
+    """Location of the rotating application log."""
+    return APP_ROOT / "logs" / "app.log"
+
+
+def _configure_logging(level: int) -> None:
+    """Log to console and to a rotating file so failures can be diagnosed later."""
+    logging.basicConfig(level=level)
+    path = _log_file_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    root = logging.getLogger()
+    already = any(
+        isinstance(h, RotatingFileHandler) and Path(getattr(h, "baseFilename", "")) == path
+        for h in root.handlers
+    )
+    if already:
+        return
+    handler = RotatingFileHandler(path, maxBytes=2_000_000, backupCount=3, encoding="utf-8")
+    handler.setFormatter(
+        logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
+    )
+    handler.setLevel(level)
+    root.addHandler(handler)
+
+
+def _wants_json_response() -> bool:
+    """True only for API-style callers, so browsers still get the HTML error page."""
+    if request.path.endswith("/api/parse-events") or "/api/" in request.path:
+        return True
+    if request.is_json:
+        return True
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        return True
+    accept = request.accept_mimetypes
+    return bool(accept["application/json"] > accept["text/html"])
+
+
 def create_app() -> Flask:
     app = Flask(__name__, template_folder="templates", static_folder="static")
     app.config["SECRET_KEY"] = _secret_key()
     app.config["MAX_CONTENT_LENGTH"] = get_config().csv.max_file_bytes
 
-    logging.basicConfig(level=getattr(logging, get_config().log_level.upper(), logging.INFO))
+    _configure_logging(getattr(logging, get_config().log_level.upper(), logging.INFO))
 
     app.jinja_env.filters["format_number"] = _format_number
     app.jinja_env.filters["format_optional"] = _format_optional
@@ -201,7 +239,7 @@ def create_app() -> Flask:
 
     @app.errorhandler(HTTPException)
     def _http_error(exc: HTTPException):
-        if request.path.startswith("/s/") and request.accept_mimetypes.best == "application/json":
+        if _wants_json_response():
             return jsonify({"error": exc.description or exc.name}), exc.code
         return (
             render_template(
@@ -214,11 +252,21 @@ def create_app() -> Flask:
 
     @app.errorhandler(Exception)
     def _unhandled_error(exc: Exception):
-        _log.exception("Unhandled error: %s", exc)
-        msg = "An unexpected error occurred. Please try again or contact support."
-        if request.path.startswith("/s/") and "application/json" in request.accept_mimetypes:
-            return jsonify({"error": msg}), 500
-        return render_template("error.html", title="Error", message=msg), 500
+        reference = uuid.uuid4().hex[:8]
+        _log.exception("Unhandled error [%s] on %s %s: %s", reference, request.method, request.path, exc)
+        msg = (
+            "An unexpected error occurred. Please try again, or share reference "
+            f"{reference} with support."
+        )
+        if _wants_json_response():
+            return jsonify({"error": msg, "reference": reference}), 500
+        return render_template(
+            "error.html",
+            title="Error",
+            message=msg,
+            reference=reference,
+            log_path=str(_log_file_path()),
+        ), 500
 
     @app.errorhandler(RequestEntityTooLarge)
     def _too_large(_exc: RequestEntityTooLarge):
@@ -305,8 +353,8 @@ def register_routes(app: Flask) -> None:
             )
 
         _validate_csrf_form(sess)
-        overrides = _overrides_from_form(request.form, sess.schema.all_columns)
         try:
+            overrides = _overrides_from_form(request.form, sess.schema.all_columns)
             schema = apply_schema_overrides(sess.schema, overrides, df=sess.raw_df)
             cleaned, report = validate_dataframe(sess.raw_df, schema, config=_session_config(sess))
         except ValueError as exc:
@@ -1255,19 +1303,46 @@ def _settings_from_form(form) -> SessionSettings:
     )
 
 
+FIELD_LABELS: Dict[str, str] = {
+    "date_column": "Date column",
+    "amount_column": "Amount / liability column",
+    "count_column": "Count column",
+    "case_id_column": "Case ID column",
+    "business_unit_column": "Business unit column",
+    "product_column": "Product column",
+    "category_column": "Category column",
+    "status_column": "Status column",
+    "reason_code_column": "Reason code column",
+}
+
+
 def _overrides_from_form(form, columns: List[str]) -> SchemaMappingOverride:
     cols = set(columns)
+    labels = {v.casefold() for v in FIELD_LABELS.values()}
 
     def pick(name: str) -> Optional[str]:
-        val = (form.get(name) or "").strip()
-        if not val:
+        if name not in form:
+            # Field absent from the submission: leave the detected mapping untouched.
             return None
+        val = (form.get(name) or "").strip()
+        if not val or val.casefold() in labels:
+            # Explicit "none" (or a label submitted by autofill) clears the mapping,
+            # so a wrong auto-detected column can actually be removed by the user.
+            return ""
         if val not in cols:
-            raise ValueError(f"Unknown column: {val}")
+            field = FIELD_LABELS.get(name, name)
+            raise ValueError(
+                f"'{val}' is not a column in the uploaded file. "
+                f"Please choose a valid option for {field}."
+            )
         return val
 
+    date_choice = pick("date_column")
+    if date_choice == "":
+        raise ValueError("A date column is required. Please choose one.")
+
     return SchemaMappingOverride(
-        date_column=pick("date_column"),
+        date_column=date_choice,
         amount_column=pick("amount_column"),
         count_column=pick("count_column"),
         case_id_column=pick("case_id_column"),

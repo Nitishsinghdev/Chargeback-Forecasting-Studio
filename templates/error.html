@@ -7,6 +7,13 @@
       <div class="card-header bg-danger"><i class="fa-solid fa-circle-exclamation me-2"></i>{{ title or 'Something went wrong' }}</div>
       <div class="card-body">
         <p>{{ message }}</p>
+        {% if reference %}
+        <p class="text-muted small mb-3">
+          Technical details were written to the application log
+          {% if log_path %}(<code>{{ log_path }}</code>){% endif %}
+          under reference <code>{{ reference }}</code>.
+        </p>
+        {% endif %}
         <a class="btn btn-cb-primary" href="{{ url_for('index') }}">Return home</a>
       </div>
     </div>
